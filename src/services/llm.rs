@@ -17,6 +17,12 @@ pub enum LlmError {
     InvalidResponse(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LlmProvider {
+    OpenRouter,
+    Groq,
+}
+
 #[derive(Debug, Serialize)]
 struct ChatMessage {
     role: String,
@@ -78,6 +84,7 @@ pub struct LlmClient {
     client: Client,
     base_url: String,
     api_key: String,
+    provider: LlmProvider,
 }
 
 impl LlmClient {
@@ -90,7 +97,30 @@ impl LlmClient {
             client: Client::new(),
             base_url,
             api_key,
+            provider: LlmProvider::OpenRouter,
         })
+    }
+
+    /// Create a Groq client for faster inference (~500ms vs ~700ms+)
+    pub fn new_groq() -> Result<Self, LlmError> {
+        let api_key = env::var("GROQ_API_KEY").map_err(|_| LlmError::MissingApiKey)?;
+        let base_url =
+            env::var("GROQ_BASE_URL").unwrap_or_else(|_| "https://api.groq.com/openai/v1".to_string());
+
+        Ok(Self {
+            client: Client::new(),
+            base_url,
+            api_key,
+            provider: LlmProvider::Groq,
+        })
+    }
+
+    /// Get the default fast model for this provider
+    pub fn default_model(&self) -> &str {
+        match self.provider {
+            LlmProvider::Groq => "llama-3.1-8b-instant",
+            LlmProvider::OpenRouter => "nvidia/nemotron-3-nano-30b-a3b:free",
+        }
     }
 
     pub async fn complete(
@@ -122,16 +152,20 @@ impl LlmClient {
             temperature,
         };
 
-        let response = self
+        let mut req = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .header("HTTP-Referer", "https://cleuly.app")
-            .header("X-Title", "Cleuly")
-            .json(&request)
-            .send()
-            .await?;
+            .header("Content-Type", "application/json");
+
+        // OpenRouter requires these headers
+        if self.provider == LlmProvider::OpenRouter {
+            req = req
+                .header("HTTP-Referer", "https://cleuly.app")
+                .header("X-Title", "Cleuly");
+        }
+
+        let response = req.json(&request).send().await?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();

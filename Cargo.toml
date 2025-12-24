@@ -29,6 +29,18 @@ validator = { version = "0.20.0", features = ["derive"] }
 name = "cleanup"
 path = "scripts/cleanup.rs"
 
+[[bin]]
+name = "benchmark"
+path = "scripts/benchmark_models.rs"
+
+[[bin]]
+name = "benchmark_groq"
+path = "scripts/benchmark_groq.rs"
+
+[[bin]]
+name = "test_speed"
+path = "scripts/test_speed.rs"
+
 [dev-dependencies]
 axum-test = "18.4.1"
 tokio-test = "0.4.4"

@@ -4,7 +4,6 @@ use axum::{
     Json,
 };
 use bson::oid::ObjectId;
-use std::env;
 
 use crate::modules::session::crud::SessionCrud;
 use crate::modules::session::model::Message;
@@ -199,15 +198,17 @@ pub async fn transcribe_and_respond(
             )
         })?;
 
-    // Get AI response
-    let llm = LlmClient::new().map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(MessageResponse { message: e.to_string() }),
-        )
-    })?;
+    // Get AI response (use Groq for speed, fallback to OpenRouter)
+    let llm = LlmClient::new_groq()
+        .or_else(|_| LlmClient::new())
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(MessageResponse { message: e.to_string() }),
+            )
+        })?;
 
-    let model = env::var("DEFAULT_MODEL").unwrap_or_else(|_| "xiaomi/mimo-v2-flash:free".to_string());
+    let model = llm.default_model().to_string();
 
     let ai_result = llm
         .suggest(&result.text, &model, Some("interview"))
