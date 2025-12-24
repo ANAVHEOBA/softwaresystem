@@ -41,6 +41,10 @@ path = "scripts/benchmark_groq.rs"
 name = "test_speed"
 path = "scripts/test_speed.rs"
 
+[[bin]]
+name = "test_prompts"
+path = "scripts/test_prompts.rs"
+
 [dev-dependencies]
 axum-test = "18.4.1"
 tokio-test = "0.4.4"

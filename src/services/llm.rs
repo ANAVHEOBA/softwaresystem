@@ -198,31 +198,57 @@ impl LlmClient {
 
     pub async fn suggest(&self, context: &str, model: &str, suggestion_type: Option<&str>) -> Result<LlmResponse, LlmError> {
         let system_prompt = match suggestion_type {
-            Some("interview") => "You are an expert interview coach. Based on the conversation context, provide concise, helpful response suggestions. Be direct and actionable.",
-            Some("meeting") => "You are a meeting assistant. Analyze the conversation and suggest relevant talking points, questions, or responses.",
-            Some("coding") => "You are a coding assistant. Provide code suggestions, fixes, or explanations based on the context.",
-            _ => "You are a helpful AI assistant. Analyze the context and provide useful suggestions for how to respond or proceed.",
+            Some("interview") | Some("coding_interview") => r#"You are a real-time coding interview coach. Be EXTREMELY concise.
+
+For coding: give optimal solution in code block, then "Time: O(?) | Space: O(?) | Pattern: [name]"
+For behavioral: give 2-3 bullet points max
+For system design: list 3-5 key components
+
+NO lengthy explanations. Direct answers only."#,
+
+            Some("leetcode") | Some("coding") => r#"You are an expert competitive programmer. Give CONCISE answers.
+
+FORMAT:
+```python
+[code]
+```
+Time: O(?) | Space: O(?) | Pattern: [name]
+
+NO explanations unless asked. Code only."#,
+
+            Some("meeting") => r#"You are a meeting assistant providing real-time suggestions.
+
+RULES:
+- Give actionable responses the user can say immediately
+- Keep suggestions brief (1-2 sentences each)
+- Be professional but natural
+- Provide 2-3 options when appropriate"#,
+
+            _ => r#"You are Cleuly, a real-time AI assistant. Be direct, concise, and helpful. Give answers the user can use immediately."#,
         };
 
-        let prompt = format!(
-            "Based on this context, provide 2-3 helpful suggestions:\n\n{}",
-            context
-        );
+        let prompt = match suggestion_type {
+            Some("interview") | Some("coding_interview") | Some("leetcode") | Some("coding") => {
+                format!("Solve this:\n\n{}", context)
+            }
+            _ => format!("Help with this:\n\n{}", context),
+        };
 
-        self.complete(&prompt, model, Some(system_prompt), Some(500), Some(0.7)).await
+        self.complete(&prompt, model, Some(system_prompt), Some(800), Some(0.3)).await
     }
 
     pub async fn analyze(&self, text: &str, model: &str, analysis_type: Option<&str>) -> Result<LlmResponse, LlmError> {
         let system_prompt = match analysis_type {
-            Some("sentiment") => "Analyze the sentiment and emotional tone of the text. Provide a brief analysis.",
-            Some("intent") => "Identify the speaker's intent and underlying goals in this text.",
-            Some("summary") => "Provide a concise summary of the key points.",
-            Some("technical") => "Analyze the technical content and provide insights.",
-            _ => "Analyze this text and provide useful insights about its content, tone, and meaning.",
+            Some("sentiment") => "Analyze sentiment briefly. Format: [POSITIVE/NEGATIVE/NEUTRAL] - one line explanation.",
+            Some("intent") => "Identify the speaker's intent in one sentence.",
+            Some("summary") => "Summarize in 2-3 bullet points maximum.",
+            Some("technical") => "Explain the technical concept concisely with a code example if relevant.",
+            Some("debug") => r#"You are a debugging expert. Identify the bug, explain why it happens, and provide the fix. Be direct."#,
+            _ => "Provide a brief, useful analysis.",
         };
 
-        let prompt = format!("Analyze the following:\n\n{}", text);
+        let prompt = format!("{}", text);
 
-        self.complete(&prompt, model, Some(system_prompt), Some(500), Some(0.5)).await
+        self.complete(&prompt, model, Some(system_prompt), Some(600), Some(0.3)).await
     }
 }
